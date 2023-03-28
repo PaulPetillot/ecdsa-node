@@ -29,27 +29,28 @@ app.get("/balance/:address", (req, res) => {
 });
 
 app.post("/send", async (req, res) => {
-  const newTransactionId = parseInt(transactionIds.slice(-1)) + 1
-  const { sender, recipient, amount, signedMessage } = req.body;
+  const { sender, recipient, amount, signedMessage, messageHash, id } = req.body;
+  const newTransactionId = parseInt(id)
+  const isIdAlreadyUsed = transactionIds.includes(newTransactionId)
 
-  const hashedMessage = hashMessage(JSON.stringify({
+  const reconstructedHash = toHex(hashMessage(JSON.stringify({
     amount,
     recipient,
     id: newTransactionId
-  }))
-
+  })))
 
   const [signature, recoveryBit] = signedMessage
   const convertedSignature = new Uint8Array(Object.values(signature))
+  const messageHashUint = new Uint8Array(Object.values(messageHash))
+  const isHashCorrect = reconstructedHash === toHex(messageHashUint)
 
+  const publicKey = await secp.recoverPublicKey(messageHashUint, convertedSignature, recoveryBit)
+  const isSigned = await secp.verify(convertedSignature, messageHashUint, publicKey);
 
-  const publicKey = await secp.recoverPublicKey(hashedMessage, convertedSignature, recoveryBit)
-  const isSigned = await secp.verify(convertedSignature, hashedMessage, publicKey);
-
-  if (isSigned) {
+  if (isSigned && isHashCorrect && !isIdAlreadyUsed) {
     setInitialBalance(sender);
     setInitialBalance(recipient);
-    transactionIds.push(transactionIds.slice(-1) + 1)
+    transactionIds.push(parseInt(transactionIds.slice(-1)) + 1)
 
     if (balances[sender] < amount) {
       res.status(400).send({ message: "Not enough funds!" });

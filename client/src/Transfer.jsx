@@ -43,6 +43,8 @@ function Transfer({ address, setBalance, privateKey }) {
           amount: parseInt(sendAmount),
           recipient,
           signedMessage,
+          messageHash,
+          id: parseInt(newId),
         })
         setBalance(balance)
       } catch (ex) {
